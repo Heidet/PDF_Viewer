@@ -1,6 +1,5 @@
 # Project Name
 
-[![Build Status](https://github.com/Heidet/PDF_Viewer.git?branch=master)](https://github.com/Heidet/PDF_Viewer.git)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 Description brève du projet, expliquant son objectif et ses fonctionnalités principales.
