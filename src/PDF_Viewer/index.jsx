@@ -14,8 +14,21 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import Button from '@mui/material/Button';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faEraser } from '@fortawesome/free-solid-svg-icons';
+import { faFont } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarDays } from '@fortawesome/free-solid-svg-icons';
+import { faSignature } from '@fortawesome/free-solid-svg-icons';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import MenuIcon from '@mui/icons-material/Menu';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
+pdfjs.GlobalWorkerOptions.useWorkerFetch = true; // Add this line to disable worker-based fetching
 
 function downloadURI(uri, name) {
   var link = document.createElement("a");
@@ -37,18 +50,54 @@ function App() {
   const [totalPages, setTotalPages] = useState(0);
   const [pageDetails, setPageDetails] = useState(null);
   const documentRef = useRef(null);
-  const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedText, setSelectedText] = useState('');
+  const [searchWord, setSearchWord] = useState('');
+  const [highlights, setHighlights] = useState([]);
+  const [searchReady, setSearchReady] = useState(false);
 
   useEffect(() => {
-    setNumPages(null);
+    // if (pdf && searchReady) {
+    //   handleSearch();
+    // }
     setCurrentPage(1);
     setSelectedText('');
   }, []);
 
-  const handleDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
+  const handleSearch = () => {
+    // if (!pdf || !searchWord) return;
+  
+    const searchRegex = new RegExp(searchWord, 'gi');
+    const newHighlights = [];
+  
+    for (let i = 0; i < totalPages; i++) {
+      const pageIndex = i;
+  
+      pdfjs
+        .getDocument(pdf)
+        .promise.then((pdfDocument) => {
+          pdfDocument.getPage(pageIndex + 1).then((page) => {
+            page.getTextContent().then((textContent) => {
+              const pageText = textContent.items.map((item) => item.str);
+  
+              pageText.forEach((text, index) => {
+                const matches = text.match(searchRegex);
+                if (matches) {
+                  matches.forEach((match) => {
+                    newHighlights.push({
+                      text: match,
+                      position: { pageNumber: pageIndex, boundingRect: textContent.items[index].boundingRect },
+                      pageNum: pageIndex,
+                    });
+                  });
+                }
+              });
+              console.log('newHighlights =>',newHighlights)
+              setHighlights(newHighlights);
+            });
+          });
+        });
+    }
   };
 
   const handleTextSelection = () => {
@@ -85,55 +134,80 @@ function App() {
         ) : null}
         {pdf ? (
           <div>
-            <div >
-              {!signatureURL ? (
-                <Button 
-                  variant="outlined"
-                  size="small"
-                  style={{marginRight: 8}}
-                  onClick={() => setSignatureDialogVisible(true)}
-                > Ajouter une signature </Button>
-              ) : null}
+            <Box sx={{ flexGrow: 1 }}>
+              <AppBar position="static">
+                <Toolbar variant="dense" style={{backgroundColor: '#38383d'}}>
+                {!signatureURL ? (
+                  <Button 
+                      variant="outlined"
+                      size="small"
+                      style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                      onClick={() => setSignatureDialogVisible(true)}
+                    > <FontAwesomeIcon icon={faSignature} /></Button>
+                  ) : null}
 
-              <Button 
-                style={{marginRight: 8}}
-                variant="outlined"
-                size="small"
-                onClick={() => setTextInputVisible("date")}
-              > Ajouter une Date </Button>
+                  <Button 
+                    style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTextInputVisible("date")}
+                  > <FontAwesomeIcon icon={faCalendarDays} /> </Button>
 
-              <Button 
-                style={{marginRight: 8}}
-                variant="outlined"
-                size="small"
-                onClick={() => setTextInputVisible(true)}
-              > Ajouter du texte </Button>
-              <Button 
-                style={{marginRight: 8}}
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setTextInputVisible(false);
-                  setSignatureDialogVisible(false);
-                  setSignatureURL(null);
-                  setPdf(null);
-                  setTotalPages(0);
-                  setPageNum(0);
-                  setPageDetails(null);
-                }}
-              > Effacer </Button>
-              {pdf ? (
-                <Button 
-                  variant="contained"
-                  size="small"
-                  style={{marginRight: 8}}
-                  inverted={true}
-                  onClick={() => {
-                    downloadURI(pdf, "file.pdf");
-                  }}
-                > Télécharger la version </Button>
-              ) : null}
-            </div>
+                  <Button 
+                    style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTextInputVisible(true)}
+                  > <FontAwesomeIcon icon={faFont} /> </Button>
+                  <Button 
+                    style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setTextInputVisible(false);
+                      setSignatureDialogVisible(false);
+                      setSignatureURL(null);
+                      setPdf(null);
+                      setTotalPages(0);
+                      setPageNum(0);
+                      setPageDetails(null);
+                    }}
+                  >  <FontAwesomeIcon icon={faEraser} /></Button>
+                  {pdf ? (
+                    <>
+                      <Button 
+                        variant="outlined"
+                        size="small"
+                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                        inverted={true}
+                        onClick={() => {
+                          downloadURI(pdf, "file.pdf");
+                        }}
+                      > <FontAwesomeIcon icon={faDownload} /></Button>
+                      {/* <PagingControl
+                        pageNum={pageNum}
+                        setPageNum={setPageNum}
+                        totalPages={totalPages}
+                      /> */}
+                    </>
+                  ) : null}
+                  <PagingControl
+                    style={{color: 'white'}}
+                    pageNum={pageNum}
+                    setPageNum={setPageNum}
+                    totalPages={totalPages}
+                  />
+                  <input
+                    type="text"
+                    value={searchWord}
+                    onChange={(e) => setSearchWord(e.target.value)}
+                    placeholder="Entrez le mot à rechercher"
+                  />
+                  <button onClick={() => handleSearch()}>Search</button>
+
+                </Toolbar>
+              </AppBar>
+            </Box>
             <div ref={documentRef}>
               {textInputVisible ? (
                 <DraggableText
@@ -273,14 +347,10 @@ function App() {
         ) : null}
         {pdf ? (  
           <TextSelectView>
-            <PagingControl
-              pageNum={pageNum}
-              setPageNum={setPageNum}
-              totalPages={totalPages}
-            />
-            <p>Nombre de pages : {numPages}</p>
+            <p>Nombre de pages : {totalPages}</p>
             <strong>Texte sélectionné : {selectedText}</strong>
-          </TextSelectView>) 
+          </TextSelectView>
+          ) 
         : null}
          
       </Viewer>
@@ -308,5 +378,5 @@ const Viewer = styled.div`
 `;
 
 const PdfViewer = styled.div`
-  padding-top: 2em;
+  padding-top: 4em;
 `;

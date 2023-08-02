@@ -57,7 +57,7 @@ export default function DraggableText({ onEnd, onSet, onCancel, initialText }) {
           ref={inputRef}
           style={styles.input}
           value={text}
-          placeholder={'Text'}
+          placeholder={'Texte'}
           onChange={(e) => setText(e.target.value)}
         />
       </div>
