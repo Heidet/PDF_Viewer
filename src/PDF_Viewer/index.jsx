@@ -1,7 +1,7 @@
 import "../App.css";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Drop from "./Drop";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, Page, pdfjs, Outline} from "react-pdf";
 import { PDFDocument, rgb } from "pdf-lib";
 import { blobToURL } from "../utils/Utils";
 import PagingControl from "../components/PagingControl";
@@ -55,50 +55,32 @@ function App() {
   const [searchWord, setSearchWord] = useState('');
   const [highlights, setHighlights] = useState([]);
   const [searchReady, setSearchReady] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchText, setSearchText] = useState('');
+
+  const onItemClick = ( itemPageNumber ) => {
+    console.log(itemPageNumber)
+    setPageNum(itemPageNumber.pageNumber);
+  }
+
+  const textRenderer = useCallback(
+    (textItem) => highlightPattern(textItem.str, searchText),
+    [searchText]
+  );
+
+  const highlightPattern = (text, pattern) => {
+    return text.replace(pattern, (value) => `<mark>${value}</mark>`);
+  }
+  
+  const onChange = (event)  => {
+    setSearchText(event.target.value);
+  }
 
   useEffect(() => {
-    // if (pdf && searchReady) {
-    //   handleSearch();
-    // }
+    console.log(pageNum)
     setCurrentPage(1);
     setSelectedText('');
   }, []);
-
-  const handleSearch = () => {
-    // if (!pdf || !searchWord) return;
-  
-    const searchRegex = new RegExp(searchWord, 'gi');
-    const newHighlights = [];
-  
-    for (let i = 0; i < totalPages; i++) {
-      const pageIndex = i;
-  
-      pdfjs
-        .getDocument(pdf)
-        .promise.then((pdfDocument) => {
-          pdfDocument.getPage(pageIndex + 1).then((page) => {
-            page.getTextContent().then((textContent) => {
-              const pageText = textContent.items.map((item) => item.str);
-  
-              pageText.forEach((text, index) => {
-                const matches = text.match(searchRegex);
-                if (matches) {
-                  matches.forEach((match) => {
-                    newHighlights.push({
-                      text: match,
-                      position: { pageNumber: pageIndex, boundingRect: textContent.items[index].boundingRect },
-                      pageNum: pageIndex,
-                    });
-                  });
-                }
-              });
-              console.log('newHighlights =>',newHighlights)
-              setHighlights(newHighlights);
-            });
-          });
-        });
-    }
-  };
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -145,14 +127,12 @@ function App() {
                       onClick={() => setSignatureDialogVisible(true)}
                     > <FontAwesomeIcon icon={faSignature} /></Button>
                   ) : null}
-
                   <Button 
                     style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
                     variant="outlined"
                     size="small"
                     onClick={() => setTextInputVisible("date")}
                   > <FontAwesomeIcon icon={faCalendarDays} /> </Button>
-
                   <Button 
                     style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
                     variant="outlined"
@@ -172,7 +152,7 @@ function App() {
                       setPageNum(0);
                       setPageDetails(null);
                     }}
-                  >  <FontAwesomeIcon icon={faEraser} /></Button>
+                  > <FontAwesomeIcon icon={faEraser} /></Button>
                   {pdf ? (
                     <>
                       <Button 
@@ -184,11 +164,6 @@ function App() {
                           downloadURI(pdf, "file.pdf");
                         }}
                       > <FontAwesomeIcon icon={faDownload} /></Button>
-                      {/* <PagingControl
-                        pageNum={pageNum}
-                        setPageNum={setPageNum}
-                        totalPages={totalPages}
-                      /> */}
                     </>
                   ) : null}
                   <PagingControl
@@ -197,14 +172,10 @@ function App() {
                     setPageNum={setPageNum}
                     totalPages={totalPages}
                   />
-                  <input
-                    type="text"
-                    value={searchWord}
-                    onChange={(e) => setSearchWord(e.target.value)}
-                    placeholder="Entrez le mot à rechercher"
-                  />
-                  <button onClick={() => handleSearch()}>Search</button>
-
+                  <div>
+                    <label htmlFor="search">Search:</label>
+                    <input type="search" id="search" value={searchText} onChange={onChange} />
+                  </div>
                 </Toolbar>
               </AppBar>
             </Box>
@@ -238,12 +209,9 @@ function App() {
                       (y * originalHeight) / documentRef.current.clientHeight;
                     const newX =
                       (x * originalWidth) / documentRef.current.clientWidth;
-
                     const pdfDoc = await PDFDocument.load(pdf);
-
                     const pages = pdfDoc.getPages();
                     const firstPage = pages[pageNum];
-
                     firstPage.drawText(text, {
                       x: newX,
                       y: newY,
@@ -332,15 +300,25 @@ function App() {
                   setTotalPages(data.numPages);
                 }}
               >
+                <Outline onItemClick={onItemClick} />
                 <Page
                   pageNumber={pageNum + 1}
                   onClick={handleTextSelection}
+                  customTextRenderer={textRenderer}
                   width={800}
                   height={1200}
                   onLoadSuccess={(data) => {
                     setPageDetails(data);
                   }}
-                />
+                >
+                  {searchResults.map((highlight, index) => (
+                    <HighlightBox
+                      key={index}
+                      position={highlight.position.boundingRect}
+                      color="yellow"
+                    />
+                  ))}
+                </Page>
               </Document>
             </div>
           </div>
@@ -352,7 +330,6 @@ function App() {
           </TextSelectView>
           ) 
         : null}
-         
       </Viewer>
     </PdfViewer>
   );
@@ -360,6 +337,17 @@ function App() {
 
 export default App;
 
+const HighlightBox = styled.div`
+  position: absolute;
+  pointer-events: none;
+  background-color: ${props => props.color};
+  opacity: 0.5;
+  z-index: 1;
+  top: ${props => props.position.top}px;
+  left: ${props => props.position.left}px;
+  width: ${props => props.position.width}px;
+  height: ${props => props.position.height}px;
+`;
 
 const TextSelectView = styled.div`
   width: 30%;
@@ -378,5 +366,8 @@ const Viewer = styled.div`
 `;
 
 const PdfViewer = styled.div`
-  padding-top: 4em;
+  // padding-top: 4em;
+  .highlighted-text {
+    background-color: yellow;
+  }
 `;

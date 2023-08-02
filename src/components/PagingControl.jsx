@@ -15,24 +15,24 @@ export default function PagingControl({totalPages, pageNum, setPageNum}) {
   return (
     <div style={styles.container}>
       <div style={styles.inlineFlex}>
-        <Button
+        {/* <Button
           size="small"
           style={{marginRight: 8, color: 'white'}}
           onClick={() => setPageNum(pageNum - 1)}
           disabled={pageNum-1===-1}
-        > Précedent </Button>
+        > Précedent </Button> */}
         {/* <div style={styles.pageInfo}>
           Page: {pageNum + 1}/{totalPages}
         </div> */}
         <div style={styles.pageInfo}>
           {pageNum + 1}/{totalPages}
         </div>
-        <Button
+        {/* <Button
           size="small"
           style={{marginRight: 8, color: 'white'}}
           onClick={() => setPageNum(pageNum + 1)}
           disabled={pageNum+1>totalPages-1}
-        > Suivant </Button>
+        > Suivant </Button> */}
       </div>
     </div>
   );
