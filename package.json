@@ -26,8 +26,10 @@
     "react-icons": "^4.10.1",
     "react-pdf": "^7.3.3",
     "react-pdf-highlighter": "^6.1.0",
+    "react-pdf-print": "^0.2.0",
     "react-scripts": "5.0.1",
     "react-signature-canvas": "^1.0.6",
+    "react-to-print": "^2.14.13",
     "styled-components": "^6.0.5",
     "web-vitals": "^2.1.4"
   },

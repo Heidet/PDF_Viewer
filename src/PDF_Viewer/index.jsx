@@ -22,10 +22,11 @@ import { faSignature } from '@fortawesome/free-solid-svg-icons';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
+import { faPrint } from '@fortawesome/free-solid-svg-icons';
 
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
-pdfjs.GlobalWorkerOptions.useWorkerFetch = true; // Add this line to disable worker-based fetching
+pdfjs.GlobalWorkerOptions.useWorkerFetch = true;
 
 function downloadURI(uri, name) {
   var link = document.createElement("a");
@@ -36,32 +37,73 @@ function downloadURI(uri, name) {
   document.body.removeChild(link);
 }
 
-function App() {
+export default function App () {
   const [pdf, setPdf] = useState(null);
+  const [initPdfURL, setInitPdfURL] = useState(null);
+
+  const [pdfContent, setPdfContent] = useState(null);
   const [autoDate, setAutoDate] = useState(true);
   const [signatureURL, setSignatureURL] = useState(null);
   const [position, setPosition] = useState(null);
   const [signatureDialogVisible, setSignatureDialogVisible] = useState(false);
   const [textInputVisible, setTextInputVisible] = useState(false);
-  const [pageNum, setPageNum] = useState(0);
+  const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [pageDetails, setPageDetails] = useState(null);
   const documentRef = useRef(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [selectedText, setSelectedText] = useState('');
-  const [searchWord, setSearchWord] = useState('');
-  const [highlights, setHighlights] = useState([]);
-  const [searchReady, setSearchReady] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
   const [searchText, setSearchText] = useState('');
+  const [printingPdf, setPrintingPdf] = useState(false);
+  const [pdfContentUrlPrint, setPdfContentUrlPrint] = useState([]);
 
+  
   const onSearchPage = (itemPageNumber) => {
     const parsedPageNumber = parseInt(itemPageNumber, 10); 
     if (!isNaN(parsedPageNumber) && parsedPageNumber > 0 && parsedPageNumber <= totalPages) {
       setPageNum(parsedPageNumber);
-    } else {
-      console.error('Invalid page number');
+    } 
+  }
+
+  const handlePrintPdf = async () => {
+
+    if (pdf) {
+      var frame = document.getElementById('frame')
+      console.log('frame =>',frame)
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+      // const pdfContent = await fetch(pdf).then((res) => res.blob());
+      // const pdfURL = URL.createObjectURL(pdfContent);
+      // console.log('pdfURL =>', pdfURL)
+      // setPdfContentUrlPrint(pdfURL)
+      // setPrintingPdf(true); 
+      // Delay the actual printing by a short time to ensure the iframe is rendered before printing
+      // setTimeout(() => {
+      //   window.print(); // Print the contents of the iframe
+      //   setPrintingPdf(false); // Reset printingPdf to false to show the Document again
+      // }, 500);
     }
+  };
+  // const handlePrintPdf = async () => {
+  //   // const printWindow = window.open('', '_blank');
+  //   // if (printWindow) {
+  //     const pdfContent = await fetch(pdf).then((res) => res.blob());
+  //     const pdfURL = URL.createObjectURL(pdfContent);
+      
+  //     document.write(
+  //       `<iframe width="100%" height="100%" src="${pdfURL}"></iframe>`
+  //     );
+  //     // printWindow.document.close();
+  //     // printWindow.onload = () => {
+  //     //   printWindow.print();
+  //     //   URL.revokeObjectURL(pdfURL);
+  //     // };
+  //   // }
+  // };
+
+  const initPdfUrl = async () => {
+    const pdfContent = await fetch(pdf).then((res) => res.blob());
+    const pdfURL = URL.createObjectURL(pdfContent);
+    setInitPdfURL(pdfURL)
   }
 
   const textRenderer = useCallback(
@@ -70,17 +112,19 @@ function App() {
   );
 
   const highlightPattern = (text, pattern) => {
-    return text.replace(pattern, (value) => `<mark>${value}</mark>`);
+    const lowerText = text.toUpperCase();
+    const lowerPattern = pattern.toUpperCase();
+    return lowerText.replace(new RegExp(lowerPattern, "g"), (value) => `<mark><strong>${value}</strong></mark>`);
   }
   
   const onChange = (event)  => {
-    setSearchText(event.target.value);
+    setSearchText(event.target.value.toLowerCase());
   }
 
   useEffect(() => {
-    setCurrentPage(1);
     setSelectedText('');
   }, []);
+
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -90,6 +134,18 @@ function App() {
       setSelectedText('');
     }
   };
+
+  useEffect(() => {
+    if (pdf) {
+      const initPdfUrl = async () => {
+        const pdfContent = await fetch(pdf).then((res) => res.blob());
+        const pdfURL = URL.createObjectURL(pdfContent);
+        setInitPdfURL(pdfURL);
+      };
+      initPdfUrl();
+      console.log(initPdfURL);
+    }
+  }, [pdf]);
 
   return (
     <PdfViewer>
@@ -114,9 +170,11 @@ function App() {
             }}
           />
         ) : null}
+
         {pdf ? (
           <div>
             <Box sx={{ flexGrow: 1 }}>
+            {pdf ? (
               <AppBar position="static">
                 <Toolbar variant="dense" style={{backgroundColor: '#38383d'}}>
                 {!signatureURL ? (
@@ -153,52 +211,42 @@ function App() {
                       setPageDetails(null);
                     }}
                   > <FontAwesomeIcon icon={faEraser} /></Button>
-                  {pdf ? (
+                  {pdf && !printingPdf ? (
                     <>
-                      <Button 
+                      <Button
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
                         size="small"
-                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
-                        inverted={true}
                         onClick={() => {
                           downloadURI(pdf, "file.pdf");
                         }}
-                      > <FontAwesomeIcon icon={faDownload} /></Button>
+                      >
+                        <FontAwesomeIcon icon={faDownload} />
+                      </Button>
                     </>
                   ) : null}
-                      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-                        {/* <Button
-                          size="small"
-                          style={{marginRight: 8, color: 'white'}}
-                          onClick={() => setPageNum(pageNum - 1)}
-                          disabled={pageNum-1===-1}
-                        > Précedent </Button> */}
-                        {/* <div style={styles.pageInfo}>
-                          Page: {pageNum + 1}/{totalPages}
-                        </div> */}
-                        <div style={{color: 'white',fontSize: 14}}>
-                          <input style={{width: '20px'}} onChange={(e) => onSearchPage(e.target.value)} defaultValue={pageNum}></input>/{totalPages}
-                        </div>
-                        {/* <Button
-                          size="small"
-                          style={{marginRight: 8, color: 'white'}}
-                          onClick={() => setPageNum(pageNum + 1)}
-                          disabled={pageNum+1>totalPages-1}
-                        > Suivant </Button> */}
+                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                      <div style={{color: 'white',fontSize: 14}}>
+                        <input style={{width: '20px'}} onChange={(e) => onSearchPage(e.target.value)} defaultValue={pageNum}></input>/{totalPages}
                       </div>
-                  {/* <PagingControl
-                    style={{color: 'white'}}
-                    pageNum={pageNum}
-                    setPageNum={setPageNum}
-                    totalPages={totalPages}
-                  /> */}
-                  <div style={{marginLeft: 8}}>
-                    <label htmlFor="search">Rechercher: </label>
-                    <input style={{marginLeft: 2}} type="search" id="search" value={searchText} onChange={onChange} />
-                  </div>
-                </Toolbar>
-              </AppBar>
-            </Box>
+                    </div>
+                    <div style={{marginLeft: 8}}>
+                      <label htmlFor="search">Rechercher: </label>
+                      <input style={{marginLeft: 2}} type="search" id="search" value={searchText} onChange={onChange} />
+                    </div>
+                    <Button
+                      style={{ height: '2.5em', marginLeft: 8, color: 'white', border: "1px solid white" }}
+                      variant="outlined"
+                      size="small"
+                      onClick={handlePrintPdf}
+                    >
+                      <FontAwesomeIcon icon={faPrint} />
+                    </Button>
+                  </Toolbar>
+                </AppBar>
+              ) : null}
+              </Box>
+        
             <div ref={documentRef}>
               {textInputVisible ? (
                 <DraggableText
@@ -311,26 +359,41 @@ function App() {
                   onEnd={setPosition}
                 />
               ) : null}
-              <Document
-                file={pdf}
-                onLoadSuccess={(data) => {
-                  setTotalPages(data.numPages);
-                }}
-              >
-                {/* <Outline onItemClick={(e) => onSearchPage(e.pageNumber)} /> */}
-                <Page
-                  pageNumber={pageNum + 1}
-                  onClick={handleTextSelection}
-                  customTextRenderer={textRenderer}
-                  width={800}
-                  height={1200}
-                  onLoadSuccess={(data) => {
-                    setPageDetails(data);
-                  }}
-                >
-                </Page>
-              </Document>
-            </div>
+
+  
+
+              {pdf ? (
+                <>
+                  <Document
+                    file={pdf}
+                    onLoadSuccess={(data) => {
+                      setTotalPages(data.numPages);
+                    }}
+                  >
+                    {/* <Outline onItemClick={(e) => onSearchPage(e.pageNumber)} /> */}
+                    <Page
+                      pageNumber={pageNum + 1}
+                      onClick={handleTextSelection}
+                      customTextRenderer={textRenderer}
+                      width={800}
+                      height={1200}
+                      onLoadSuccess={(data) => {
+                        setPageDetails(data);
+                      }}
+                    >
+                    </Page>
+                  </Document>
+                  <iframe
+                    width="800" height="1200" toolbar="1"
+                    title="PDF Viewer"
+                
+                    id="frame"
+                    src={initPdfURL}
+                    style={{ border: 'none', display: 'none' }}
+                  />
+                </>
+                ) : null} 
+              </div>
           </div>
         ) : null}
         {pdf ? (  
@@ -345,7 +408,7 @@ function App() {
   );
 }
 
-export default App;
+
 
 const TextSelectView = styled.div`
   width: 30%;
