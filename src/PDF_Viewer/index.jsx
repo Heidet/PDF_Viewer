@@ -28,20 +28,15 @@ import { faPrint } from '@fortawesome/free-solid-svg-icons';
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 pdfjs.GlobalWorkerOptions.useWorkerFetch = true;
 
-function downloadURI(uri, name) {
-  var link = document.createElement("a");
-  link.download = name;
-  link.href = uri;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+const ALLOWBTNSIGNATURE = true
+const ALLOWBTNDATE = true
+const ALLOWBTNTEXT = true
+const ALLOWBTNERASE = true
+
 
 export default function App () {
   const [pdf, setPdf] = useState(null);
   const [initPdfURL, setInitPdfURL] = useState(null);
-
-  const [pdfContent, setPdfContent] = useState(null);
   const [autoDate, setAutoDate] = useState(true);
   const [signatureURL, setSignatureURL] = useState(null);
   const [position, setPosition] = useState(null);
@@ -53,58 +48,63 @@ export default function App () {
   const documentRef = useRef(null);
   const [selectedText, setSelectedText] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [printingPdf, setPrintingPdf] = useState(false);
-  const [pdfContentUrlPrint, setPdfContentUrlPrint] = useState([]);
 
+
+  const downloadURI = (uri, name) => {
+    var link = document.createElement("a");
+    link.download = name;
+    link.href = uri;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
   
-  const onSearchPage = (itemPageNumber) => {
-    const parsedPageNumber = parseInt(itemPageNumber, 10); 
+  const onJumpToPage = (pageNumber) => {
+    const parsedPageNumber = parseInt(pageNumber, 10);
     if (!isNaN(parsedPageNumber) && parsedPageNumber > 0 && parsedPageNumber <= totalPages) {
       setPageNum(parsedPageNumber);
-    } 
-  }
-
-  const handlePrintPdf = async () => {
-
-    if (pdf) {
-      var frame = document.getElementById('frame')
-      console.log('frame =>',frame)
-      frame.contentWindow.focus();
-      frame.contentWindow.print();
-      // const pdfContent = await fetch(pdf).then((res) => res.blob());
-      // const pdfURL = URL.createObjectURL(pdfContent);
-      // console.log('pdfURL =>', pdfURL)
-      // setPdfContentUrlPrint(pdfURL)
-      // setPrintingPdf(true); 
-      // Delay the actual printing by a short time to ensure the iframe is rendered before printing
-      // setTimeout(() => {
-      //   window.print(); // Print the contents of the iframe
-      //   setPrintingPdf(false); // Reset printingPdf to false to show the Document again
-      // }, 500);
     }
   };
-  // const handlePrintPdf = async () => {
-  //   // const printWindow = window.open('', '_blank');
-  //   // if (printWindow) {
-  //     const pdfContent = await fetch(pdf).then((res) => res.blob());
-  //     const pdfURL = URL.createObjectURL(pdfContent);
-      
-  //     document.write(
-  //       `<iframe width="100%" height="100%" src="${pdfURL}"></iframe>`
-  //     );
-  //     // printWindow.document.close();
-  //     // printWindow.onload = () => {
-  //     //   printWindow.print();
-  //     //   URL.revokeObjectURL(pdfURL);
-  //     // };
-  //   // }
-  // };
 
-  const initPdfUrl = async () => {
-    const pdfContent = await fetch(pdf).then((res) => res.blob());
-    const pdfURL = URL.createObjectURL(pdfContent);
-    setInitPdfURL(pdfURL)
-  }
+  const handlePrintPdf = async () => {
+    if (pdf) {
+      var frame = document.getElementById('frame')
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    }
+  };
+
+  const handleScroll = (pageNumber) => {
+    // if (documentRef.current) {
+    //   const parentElement = documentRef.current;
+    //   const pageElements = parentElement.querySelectorAll('[data-page-number]');
+  
+    //   let currentPageNumber = 1;
+    //   let smallestDistanceToTop = Infinity;
+    //   for (let i = 0; i < pageElements.length; i++) {
+    //     const pageElement = pageElements[i];
+    //     const rect = pageElement.getBoundingClientRect();
+    //     const distanceToTop = Math.abs(rect.top);
+    //     if (distanceToTop < smallestDistanceToTop) {
+    //       smallestDistanceToTop = distanceToTop;
+    //       currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
+    //     }
+    //   }
+
+    //   setPageNum(currentPageNumber)
+    // }
+  };
+
+  const scrollToPage = (pageNumber) => {
+    console.log(pageNumber)
+    if (documentRef.current) {
+      const pageElement = documentRef.current.querySelector(`[data-page-number="${pageNumber}"]`);
+      if (pageElement) {
+        pageElement.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
 
   const textRenderer = useCallback(
     (textItem) => highlightPattern(textItem.str, searchText),
@@ -136,16 +136,30 @@ export default function App () {
   };
 
   useEffect(() => {
-    if (pdf) {
-      const initPdfUrl = async () => {
-        const pdfContent = await fetch(pdf).then((res) => res.blob());
-        const pdfURL = URL.createObjectURL(pdfContent);
-        setInitPdfURL(pdfURL);
-      };
-      initPdfUrl();
-      console.log(initPdfURL);
-    }
+    scrollToPage(pageNum);
+    console.log(pageNum)
+  }, [pageNum]);
+  
+  useEffect(() => {
+    // if (pdf) {
+
+    //   const initPdfUrl = async () => {
+    //     const pdfContent = await fetch(pdf).then((res) => res.blob());
+    //     const pdfURL = URL.createObjectURL(pdfContent);
+    //     console.log('pdfURL =>',pdfURL )
+
+    //     setInitPdfURL(pdfURL);
+    //   };
+    //   initPdfUrl();
+    // }
+    // console.log('pdf =>',pdf )
+    
   }, [pdf]);
+  
+  useEffect(() => {
+  
+  }, []);
+  
 
   return (
     <PdfViewer>
@@ -177,41 +191,51 @@ export default function App () {
             {pdf ? (
               <AppBar position="static">
                 <Toolbar variant="dense" style={{backgroundColor: '#38383d'}}>
-                {!signatureURL ? (
-                  <Button 
-                      variant="outlined"
-                      size="small"
-                      style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
-                      onClick={() => setSignatureDialogVisible(true)}
-                    > <FontAwesomeIcon icon={faSignature} /></Button>
-                  ) : null}
-                  <Button 
-                    style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setTextInputVisible("date")}
-                  > <FontAwesomeIcon icon={faCalendarDays} /> </Button>
-                  <Button 
-                    style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setTextInputVisible(true)}
-                  > <FontAwesomeIcon icon={faFont} /> </Button>
-                  <Button 
-                    style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      setTextInputVisible(false);
-                      setSignatureDialogVisible(false);
-                      setSignatureURL(null);
-                      setPdf(null);
-                      setTotalPages(0);
-                      setPageNum(0);
-                      setPageDetails(null);
-                    }}
-                  > <FontAwesomeIcon icon={faEraser} /></Button>
-                  {pdf && !printingPdf ? (
+                  {!signatureURL && ALLOWBTNSIGNATURE ? (
+                      <Button 
+                        variant="outlined"
+                        size="small"
+                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                        onClick={() => setSignatureDialogVisible(true)}
+                      > <FontAwesomeIcon icon={faSignature} /></Button>
+                    ) : null
+                  }
+                  {ALLOWBTNDATE ? (
+                      <Button 
+                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setTextInputVisible("date")}
+                      > <FontAwesomeIcon icon={faCalendarDays} /></Button>
+                    ) : null
+                  }
+                  {ALLOWBTNTEXT ? (
+                      <Button 
+                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setTextInputVisible(true)}
+                      > <FontAwesomeIcon icon={faFont} /></Button>
+                    ) : null
+                  }
+                  {ALLOWBTNERASE ? (
+                      <Button 
+                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setTextInputVisible(false);
+                          setSignatureDialogVisible(false);
+                          setSignatureURL(null);
+                          setPdf(null);
+                          setTotalPages(0);
+                          setPageNum(0);
+                          setPageDetails(null);
+                        }}
+                      > <FontAwesomeIcon icon={faEraser} /></Button>
+                    ) : null
+                  }
+                  {pdf ? (
                     <>
                       <Button
                         style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
@@ -227,7 +251,15 @@ export default function App () {
                   ) : null}
                     <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
                       <div style={{color: 'white',fontSize: 14}}>
-                        <input style={{width: '20px'}} onChange={(e) => onSearchPage(e.target.value)} defaultValue={pageNum}></input>/{totalPages}
+                      <input
+                        style={{ width: '40px' }}
+                        type="number"
+                        onChange={(e) => onJumpToPage(e.target.value)}
+                        value={pageNum}
+                        id="inputPageNum"
+                        // defaultValue={pageNum}
+                      />/{totalPages}
+                        {/* <input style={{width: '20px'}} onChange={(e) => onSearchPage(e.target.value)} defaultValue={pageNum}></input>/{totalPages} */}
                       </div>
                     </div>
                     <div style={{marginLeft: 8}}>
@@ -279,7 +311,7 @@ export default function App () {
 
                     const pdfDoc = await PDFDocument.load(pdf);
                     const pages = pdfDoc.getPages();
-                    const firstPage = pages[pageNum];
+                    const firstPage = pages[pageNum-1];
                     firstPage.drawText(text, {
                       x: newX,
                       y: newY,
@@ -288,7 +320,6 @@ export default function App () {
 
                     const pdfBytes = await pdfDoc.save();
                     const blob = new Blob([new Uint8Array(pdfBytes)]);
-
                     const URL = await blobToURL(blob);
                     setPdf(URL);
                     setPosition(null);
@@ -324,7 +355,7 @@ export default function App () {
 
                     const pdfDoc = await PDFDocument.load(pdf);
                     const pages = pdfDoc.getPages();
-                    const firstPage = pages[pageNum];
+                    const firstPage = pages[pageNum-1];
                     const pngImage = await pdfDoc.embedPng(signatureURL);
                     const pngDims = pngImage.scale( scale * .3);
 
@@ -359,39 +390,45 @@ export default function App () {
                   onEnd={setPosition}
                 />
               ) : null}
-
-  
-
-              {pdf ? (
-                <>
-                  <Document
-                    file={pdf}
-                    onLoadSuccess={(data) => {
-                      setTotalPages(data.numPages);
-                    }}
-                  >
-                    {/* <Outline onItemClick={(e) => onSearchPage(e.pageNumber)} /> */}
-                    <Page
-                      pageNumber={pageNum + 1}
-                      onClick={handleTextSelection}
-                      customTextRenderer={textRenderer}
-                      width={800}
-                      height={1200}
+                {pdf ? (
+                  <PdfContainer onScroll={handleScroll}>
+                    <Document
+                      file={pdf}
                       onLoadSuccess={(data) => {
-                        setPageDetails(data);
+                        setTotalPages(data.numPages);
                       }}
                     >
-                    </Page>
-                  </Document>
-                  <iframe
-                    width="800" height="1200" toolbar="1"
-                    title="PDF Viewer"
-                
-                    id="frame"
-                    src={initPdfURL}
-                    style={{ border: 'none', display: 'none' }}
-                  />
-                </>
+
+                  <React.Fragment>
+                    {Array.from(new Array(totalPages), (el, index) => (
+                      <React.Fragment key={`page_${index + 1}`}>
+                      <Page
+                        key={`page_${index + 1}`}
+                        pageNumber={index + 1}
+                        onClick={handleTextSelection}
+                        customTextRenderer={textRenderer}
+                        width={800}
+                        height={1200}
+                        onLoadSuccess={(data) => {
+                          setPageDetails(data);
+                        }}
+                        data-page-number={index + 1}
+                      />
+                      </React.Fragment>
+                    ))}
+                  </React.Fragment>
+                      {/* ))} */}
+                    </Document>
+                    {/* <iframe
+                      width="800" height="1200" 
+                      toolbar="1"
+                      title="PDF Viewer"
+                      type="application/pdf"
+                      id="frame"
+                      src={pdf}
+                      style={{ border: 'none' }}
+                    /> */}
+                  </PdfContainer>
                 ) : null} 
               </div>
           </div>
@@ -408,7 +445,13 @@ export default function App () {
   );
 }
 
-
+const PdfContainer = styled.div`
+  overflow-y: auto; 
+  height: 94vh; 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
 
 const TextSelectView = styled.div`
   width: 30%;
@@ -417,6 +460,9 @@ const TextSelectView = styled.div`
 `;
 
 const Viewer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
   display: flex;
   justify-content: center;
   align-items: center;
