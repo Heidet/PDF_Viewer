@@ -36,7 +36,6 @@ const ALLOWBTNERASE = true
 
 export default function App () {
   const [pdf, setPdf] = useState(null);
-  const [initPdfURL, setInitPdfURL] = useState(null);
   const [autoDate, setAutoDate] = useState(true);
   const [signatureURL, setSignatureURL] = useState(null);
   const [position, setPosition] = useState(null);
@@ -48,8 +47,10 @@ export default function App () {
   const documentRef = useRef(null);
   const [selectedText, setSelectedText] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [shouldExecuteOnScroll, setShouldExecuteOnScroll] = useState(true);
 
 
+  let pageNumInputRef = null;
   const downloadURI = (uri, name) => {
     var link = document.createElement("a");
     link.download = name;
@@ -58,11 +59,16 @@ export default function App () {
     link.click();
     document.body.removeChild(link);
   }
-  
+
   const onJumpToPage = (pageNumber) => {
     const parsedPageNumber = parseInt(pageNumber, 10);
     if (!isNaN(parsedPageNumber) && parsedPageNumber > 0 && parsedPageNumber <= totalPages) {
       setPageNum(parsedPageNumber);
+      setShouldExecuteOnScroll(false);
+
+      setTimeout(() => {
+        setShouldExecuteOnScroll(true);
+      }, 1000); 
     }
   };
 
@@ -74,33 +80,43 @@ export default function App () {
     }
   };
 
-  const handleScroll = (pageNumber) => {
-    // if (documentRef.current) {
-    //   const parentElement = documentRef.current;
-    //   const pageElements = parentElement.querySelectorAll('[data-page-number]');
-  
-    //   let currentPageNumber = 1;
-    //   let smallestDistanceToTop = Infinity;
-    //   for (let i = 0; i < pageElements.length; i++) {
-    //     const pageElement = pageElements[i];
-    //     const rect = pageElement.getBoundingClientRect();
-    //     const distanceToTop = Math.abs(rect.top);
-    //     if (distanceToTop < smallestDistanceToTop) {
-    //       smallestDistanceToTop = distanceToTop;
-    //       currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
-    //     }
-    //   }
-
-    //   setPageNum(currentPageNumber)
-    // }
+  const handleScroll = () => {
+    const inputPageNum = document.getElementById("inputPageNum");
+    console.log('document.activeElement =>',document.activeElement)
+    console.log('inputPageNum =>',inputPageNum)
+    if (shouldExecuteOnScroll) {
+      // if (inputPageNum !== document.activeElement) {
+        if (documentRef.current) {
+          const parentElement = documentRef.current;
+          const pageElements = parentElement.querySelectorAll('[data-page-number]');
+          let currentPageNumber = 1;
+          let smallestDistanceToTop = Infinity;
+          for (let i = 0; i < pageElements.length; i++) {
+            const pageElement = pageElements[i];
+            const rect = pageElement.getBoundingClientRect();
+            const distanceToTop = Math.abs(rect.top);
+            if (distanceToTop < smallestDistanceToTop) {
+              smallestDistanceToTop = distanceToTop;
+              currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
+            }
+          }
+          setPageNum(currentPageNumber);
+        }
+      // }
+    }
+    
   };
 
   const scrollToPage = (pageNumber) => {
-    console.log(pageNumber)
     if (documentRef.current) {
       const pageElement = documentRef.current.querySelector(`[data-page-number="${pageNumber}"]`);
       if (pageElement) {
         pageElement.scrollIntoView({ behavior: "smooth" });
+        setTimeout(() => {
+          if (pageNumInputRef) {
+            pageNumInputRef.blur();
+          }
+        }, 1000);
       }
     }
   };
@@ -115,8 +131,8 @@ export default function App () {
     const lowerText = text.toUpperCase();
     const lowerPattern = pattern.toUpperCase();
     return lowerText.replace(new RegExp(lowerPattern, "g"), (value) => `<mark><strong>${value}</strong></mark>`);
-  }
-  
+  };
+
   const onChange = (event)  => {
     setSearchText(event.target.value.toLowerCase());
   }
@@ -137,30 +153,8 @@ export default function App () {
 
   useEffect(() => {
     scrollToPage(pageNum);
-    console.log(pageNum)
   }, [pageNum]);
   
-  useEffect(() => {
-    // if (pdf) {
-
-    //   const initPdfUrl = async () => {
-    //     const pdfContent = await fetch(pdf).then((res) => res.blob());
-    //     const pdfURL = URL.createObjectURL(pdfContent);
-    //     console.log('pdfURL =>',pdfURL )
-
-    //     setInitPdfURL(pdfURL);
-    //   };
-    //   initPdfUrl();
-    // }
-    // console.log('pdf =>',pdf )
-    
-  }, [pdf]);
-  
-  useEffect(() => {
-  
-  }, []);
-  
-
   return (
     <PdfViewer>
       <Viewer>
@@ -251,15 +245,16 @@ export default function App () {
                   ) : null}
                     <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
                       <div style={{color: 'white',fontSize: 14}}>
-                      <input
-                        style={{ width: '40px' }}
-                        type="number"
-                        onChange={(e) => onJumpToPage(e.target.value)}
-                        value={pageNum}
-                        id="inputPageNum"
-                        // defaultValue={pageNum}
-                      />/{totalPages}
-                        {/* <input style={{width: '20px'}} onChange={(e) => onSearchPage(e.target.value)} defaultValue={pageNum}></input>/{totalPages} */}
+                        <input
+                          style={{ width: '40px' }}
+                          type="number"
+                          onChange={(e) => onJumpToPage(e.target.value)}
+                          value={pageNum}
+                          id="inputPageNum"
+                          ref={(input) => {
+                            pageNumInputRef = input;
+                          }}
+                        />/{totalPages}
                       </div>
                     </div>
                     <div style={{marginLeft: 8}}>
@@ -399,24 +394,24 @@ export default function App () {
                       }}
                     >
 
-                  <React.Fragment>
-                    {Array.from(new Array(totalPages), (el, index) => (
-                      <React.Fragment key={`page_${index + 1}`}>
-                      <Page
-                        key={`page_${index + 1}`}
-                        pageNumber={index + 1}
-                        onClick={handleTextSelection}
-                        customTextRenderer={textRenderer}
-                        width={800}
-                        height={1200}
-                        onLoadSuccess={(data) => {
-                          setPageDetails(data);
-                        }}
-                        data-page-number={index + 1}
-                      />
-                      </React.Fragment>
-                    ))}
-                  </React.Fragment>
+                    <React.Fragment>
+                      {Array.from(new Array(totalPages), (el, index) => (
+                        <React.Fragment key={`page_${index + 1}`}>
+                        <Page
+                          key={`page_${index + 1}`}
+                          pageNumber={index + 1}
+                          onClick={handleTextSelection}
+                          customTextRenderer={textRenderer}
+                          width={800}
+                          height={1200}
+                          onLoadSuccess={(data) => {
+                            setPageDetails(data);
+                          }}
+                          data-page-number={index + 1}
+                        />
+                        </React.Fragment>
+                      ))}
+                    </React.Fragment>
                       {/* ))} */}
                     </Document>
                     {/* <iframe
