@@ -21,8 +21,8 @@ export default function Drop({ onLoaded }) {
 
   const onDrop = useCallback((acceptedFiles) => {
     onLoaded(acceptedFiles);
-    // Do something with the files
   }, []);
+  
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: "application/pdf",

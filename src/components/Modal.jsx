@@ -1,6 +1,5 @@
 import React, {useState, useEffect} from 'react';
 import {primary45} from "../utils/Colors";
-import Button from '@mui/material/Button';
 
 function useWindowSize() {
     const isClient = typeof window === 'object';
@@ -59,7 +58,6 @@ export function Modal({onClose, children, isVisible, style, positionTop}) {
       height: '100%',
       top: 0,
       left: 0,
-      backgroundColor: '#00000033',
       zIndex: 5000,
     },
   };
