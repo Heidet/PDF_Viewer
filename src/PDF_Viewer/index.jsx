@@ -1,11 +1,11 @@
 import "../App.css";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Document, Page, pdfjs, Outline} from "react-pdf";
-import { PDFDocument, rgb } from "pdf-lib";
+import { Document, Page, pdfjs, Outline } from "react-pdf";
+import { NonFullScreenPageMode, PDFDocument, rgb } from "pdf-lib";
 import { blobToURL } from "../utils/Utils";
 import { AddSigDialog } from "../components/AddSigDialog";
 import DraggableSignature from "../components/DraggableSignature";
-import DraggableText from "../components/DraggableText";
+import DraggableInput from "../components/DraggableInput";
 import dayjs from "dayjs";
 import Drop from "./Drop";
 import styled from 'styled-components';
@@ -23,18 +23,17 @@ import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
 import { faPrint } from '@fortawesome/free-solid-svg-icons';
-
+import EditNoteIcon from '@mui/icons-material/EditNote';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 pdfjs.GlobalWorkerOptions.useWorkerFetch = true;
-
 const ALLOWBTNSIGNATURE = true
 const ALLOWBTNDATE = true
 const ALLOWBTNTEXT = true
 const ALLOWBTNERASE = true
 
 
-export default function App () {
+export default function App() {
   const [pdf, setPdf] = useState(null);
   const [autoDate, setAutoDate] = useState(true);
   const [signatureURL, setSignatureURL] = useState(null);
@@ -49,7 +48,7 @@ export default function App () {
   const [searchText, setSearchText] = useState('');
   const [shouldExecuteOnScroll, setShouldExecuteOnScroll] = useState(true);
   const [scale, setScale] = useState(1.0);
-  const scalePercentage = (scale * 100).toFixed(0)+'%';
+  const scalePercentage = (scale * 100).toFixed(0) + '%';
 
   let pageNumInputRef = null;
 
@@ -63,14 +62,22 @@ export default function App () {
     }
   };
 
+  const changeZoomInput = (inputValue) => {
+    inputValue.replace('%', '')
+    const value = (parseInt(inputValue) / 100)
+    setScale(value);
+  };
+
   const downloadURI = (uri, name) => {
-    var link = document.createElement("a");
-    link.download = name;
-    link.href = uri;
-    document.body.appendChild(link);
+    const base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
+    const blob = base64ToBlob(base64Data, 'application/pdf');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'document.pdf';
     link.click();
-    document.body.removeChild(link);
-  }
+    URL.revokeObjectURL(url);
+  };
 
   const onJumpToPage = (pageNumber) => {
     const parsedPageNumber = parseInt(pageNumber, 10);
@@ -80,15 +87,21 @@ export default function App () {
 
       setTimeout(() => {
         setShouldExecuteOnScroll(true);
-      }, 1000); 
+      }, 1000);
     }
   };
 
-  const handlePrintPdf = async () => {
-    if (pdf) {
-      var frame = document.getElementById('frame')
-      frame.contentWindow.focus();
-      frame.contentWindow.print();
+  const handlePrintPdf = () => {
+    const base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
+    const blob = base64ToBlob(base64Data, 'application/pdf');
+    const blobUrl = URL.createObjectURL(blob);
+
+    const pdfWindow = window.open(blobUrl, '_blank');
+    if (pdfWindow) {
+      pdfWindow.onload = () => {
+        pdfWindow.print();
+        URL.revokeObjectURL(blobUrl);
+      };
     }
   };
 
@@ -96,26 +109,43 @@ export default function App () {
     const inputPageNum = document.getElementById("inputPageNum");
     if (shouldExecuteOnScroll) {
       // if (inputPageNum !== document.activeElement) {
-        if (documentRef.current) {
-          const parentElement = documentRef.current;
-          const pageElements = parentElement.querySelectorAll('[data-page-number]');
-          let currentPageNumber = 1;
-          let smallestDistanceToTop = Infinity;
-          for (let i = 0; i < pageElements.length; i++) {
-            const pageElement = pageElements[i];
-            const rect = pageElement.getBoundingClientRect();
-            const distanceToTop = Math.abs(rect.top);
-            if (distanceToTop < smallestDistanceToTop) {
-              smallestDistanceToTop = distanceToTop;
-              currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
-            }
+      if (documentRef.current) {
+        const parentElement = documentRef.current;
+        const pageElements = parentElement.querySelectorAll('[data-page-number]');
+        let currentPageNumber = 1;
+        let smallestDistanceToTop = Infinity;
+        for (let i = 0; i < pageElements.length; i++) {
+          const pageElement = pageElements[i];
+          const rect = pageElement.getBoundingClientRect();
+          const distanceToTop = Math.abs(rect.top);
+          if (distanceToTop < smallestDistanceToTop) {
+            smallestDistanceToTop = distanceToTop;
+            currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
           }
-          setPageNum(currentPageNumber);
         }
+        setPageNum(currentPageNumber);
+      }
       // }
     }
-    
   };
+
+  const base64ToBlob = (base64Data, contentType) => {
+    const byteCharacters = atob(base64Data);
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
+  }
 
   const scrollToPage = (pageNumber) => {
     if (documentRef.current) {
@@ -142,14 +172,9 @@ export default function App () {
     return lowerText.replace(new RegExp(lowerPattern, "g"), (value) => `<mark><strong>${value}</strong></mark>`);
   };
 
-  const onChange = (event)  => {
+  const onChange = (event) => {
     setSearchText(event.target.value.toLowerCase());
   }
-
-  useEffect(() => {
-    setSelectedText('');
-  }, []);
-
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -161,19 +186,10 @@ export default function App () {
   };
 
   useEffect(() => {
+    setSelectedText('');
     scrollToPage(pageNum);
-    // const loadPDF = async () => {
-    //   if(pdf){
-    //     const existingPdfBytes = pdf;
-    //     const pdfDoc = await PDFDocument.load(existingPdfBytes);
-    //     const modifiedPdfBytes = await pdfDoc.save();
-    //     setPdfData(modifiedPdfBytes);
-    //   }
-    // };
-    // console.log('scale =>',scale)
-    // loadPDF();
   }, [pageNum]);
-  
+
   return (
     <PdfViewer>
       <Viewer>
@@ -188,7 +204,6 @@ export default function App () {
             }}
           />
         ) : null}
-
         {!pdf ? (
           <Drop
             onLoaded={async (files) => {
@@ -200,39 +215,37 @@ export default function App () {
         {pdf ? (
           <ViewerContent >
             <Box sx={{ flexGrow: 1 }}>
-            {pdf ? (
-              <AppBar position="static">
-                <Toolbar variant="dense" style={{backgroundColor: '#38383d'}}>
-                  {!signatureURL && ALLOWBTNSIGNATURE ? (
-                      <Button 
+              {pdf ? (
+                <AppBar position="static">
+                  <Toolbar variant="dense" style={{ backgroundColor: '#38383d' }}>
+                    {!signatureURL && ALLOWBTNSIGNATURE ? (
+                      <Button
                         variant="outlined"
                         size="small"
-                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         onClick={() => setSignatureDialogVisible(true)}
                       > <FontAwesomeIcon icon={faSignature} /></Button>
-                    ) : null
-                  }
-                  {ALLOWBTNDATE ? (
-                      <Button 
-                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                      ) : null}
+                    {ALLOWBTNDATE ? (
+                      <Button
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
                         size="small"
                         onClick={() => setTextInputVisible("date")}
                       > <FontAwesomeIcon icon={faCalendarDays} /></Button>
-                    ) : null
-                  }
-                  {ALLOWBTNTEXT ? (
-                      <Button 
-                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                    ) : null}
+                    {ALLOWBTNTEXT ? (
+                      <Button
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
                         size="small"
                         onClick={() => setTextInputVisible(true)}
                       > <FontAwesomeIcon icon={faFont} /></Button>
                     ) : null
-                  }
-                  {ALLOWBTNERASE ? (
-                      <Button 
-                        style={{height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white"}}
+                    }
+                    {ALLOWBTNERASE ? (
+                      <Button
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
                         size="small"
                         onClick={() => {
@@ -246,35 +259,36 @@ export default function App () {
                         }}
                       > <FontAwesomeIcon icon={faEraser} /></Button>
                     ) : null
-                  }
-                  {pdf ? (
-                    <>
-                      <Button
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          downloadURI(pdf, "file.pdf");
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faDownload} />
-                      </Button>
-                      <button onClick={decreaseZoom}>-</button>
-                        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-                          <div style={{color: 'white',fontSize: 14}}>
+                    }
+                    {pdf ? (
+                      <>
+                        <Button
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            downloadURI(pdf, "file.pdf");
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faDownload} />
+                        </Button>
+                        <button style={{ color: 'white', background: 'transparent', border: 'none', fontSize: '30px', marginBottom: '0.2em' }} onClick={decreaseZoom}>-</button>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                          <div style={{ color: 'white', fontSize: 14 }}>
                             <input
-                              style={{ width: '30px' }}
+                              style={{ width: '35px' }}
                               value={scalePercentage}
                               id="scalePercentage"
-                              readOnly
+                              onChange={(e) => changeZoomInput(e.target.value)}
                             />
                           </div>
                         </div>
-                      <button onClick={increaseZoom}>+</button>
-                    </>
-                  ) : null}
-                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-                      <div style={{color: 'white',fontSize: 14}}>
+                        <button style={{ color: 'white', background: 'transparent', border: 'none', fontSize: '30px' }} onClick={increaseZoom}>+</button>
+                      </>
+                    ) : null}
+                    <div style={{ color: 'silver' }}>|</div>
+                    <div style={{ marginLeft: '10px', marginRight: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ color: 'white', fontSize: 14 }}>
                         <input
                           style={{ width: '30px' }}
                           type="number"
@@ -287,9 +301,9 @@ export default function App () {
                         />/{totalPages}
                       </div>
                     </div>
-                    <div style={{marginLeft: 8}}>
-                      <label htmlFor="search">Rechercher: </label>
-                      <input style={{marginLeft: 2}} type="search" id="search" value={searchText} onChange={onChange} />
+                    <div style={{ color: 'silver' }}>|</div>
+                    <div style={{ marginLeft: 8 }}>
+                      <input placeholder="Rechercher :" style={{ marginLeft: 2, borderRadius: '0.5em' }} type="search" id="search" value={searchText} onChange={onChange} />
                     </div>
                     <Button
                       style={{ height: '2.5em', marginLeft: 8, color: 'white', border: "1px solid white" }}
@@ -302,16 +316,16 @@ export default function App () {
                   </Toolbar>
                 </AppBar>
               ) : null}
-              </Box>
-        
+            </Box>
             <div ref={documentRef}>
               {textInputVisible ? (
-                <DraggableText
+                <DraggableInput
                   initialText={
                     textInputVisible === "date"
-                      ? dayjs().format("M/d/YYYY")
+                      ? dayjs().format("d/M/YYYY")
                       : null
                   }
+                  typeField={textInputVisible}
                   onCancel={() => setTextInputVisible(false)}
                   onEnd={setPosition}
                   onSet={async (text) => {
@@ -336,7 +350,7 @@ export default function App () {
 
                     const pdfDoc = await PDFDocument.load(pdf);
                     const pages = pdfDoc.getPages();
-                    const firstPage = pages[pageNum-1];
+                    const firstPage = pages[pageNum - 1];
                     firstPage.drawText(text, {
                       x: newX,
                       y: newY,
@@ -380,9 +394,9 @@ export default function App () {
 
                     const pdfDoc = await PDFDocument.load(pdf);
                     const pages = pdfDoc.getPages();
-                    const firstPage = pages[pageNum-1];
+                    const firstPage = pages[pageNum - 1];
                     const pngImage = await pdfDoc.embedPng(signatureURL);
-                    const pngDims = pngImage.scale( scale * .3);
+                    const pngDims = pngImage.scale(scale * .3);
 
                     firstPage.drawImage(pngImage, {
                       x: newX,
@@ -394,7 +408,7 @@ export default function App () {
                     if (autoDate) {
                       firstPage.drawText(
                         `Signé ${dayjs().format(
-                          "M/d/YYYY HH:mm:ss ZZ"
+                          "d/M/YYYY HH:mm:ss ZZ"
                         )}`,
                         {
                           x: newX,
@@ -415,15 +429,14 @@ export default function App () {
                   onEnd={setPosition}
                 />
               ) : null}
-                {pdf ? (
-                  <PdfContainer onScroll={handleScroll}>
-                    <Document
-                      file={pdf}
-                      onLoadSuccess={(data) => {
-                        setTotalPages(data.numPages);
-                      }}
-                    >
-
+              {pdf ? (
+                <PdfContainer onScroll={handleScroll}>
+                  <Document
+                    file={pdf}
+                    onLoadSuccess={(data) => {
+                      setTotalPages(data.numPages);
+                    }}
+                  >
                     <React.Fragment>
                       {Array.from(new Array(totalPages), (el, index) => (
                         <React.Fragment key={`page_${index + 1}`}>
@@ -443,29 +456,17 @@ export default function App () {
                         </React.Fragment>
                       ))}
                     </React.Fragment>
-                      {/* ))} */}
-                    </Document>
-                    <iframe
-                      width="800" height="1200" 
-                      toolbar="1"
-                      title="PDF Viewer"
-                      type="application/pdf"
-                      id="frame"
-                      src={pdf}
-                      style={{ border: 'none' }}
-                    />
-                  </PdfContainer>
-                ) : null} 
-              </div>
+                  </Document>
+                </PdfContainer>
+              ) : null}
+            </div>
           </ViewerContent>
         ) : null}
-        {pdf ? (  
+        {pdf ? (
           <TextSelectView>
-            <p>Nombre de pages : {totalPages}</p>
             <strong>Texte sélectionné : {selectedText}</strong>
           </TextSelectView>
-          ) 
-        : null}
+        ): null}
       </Viewer>
     </PdfViewer>
   );
