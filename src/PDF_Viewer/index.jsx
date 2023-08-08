@@ -48,9 +48,21 @@ export default function App () {
   const [selectedText, setSelectedText] = useState('');
   const [searchText, setSearchText] = useState('');
   const [shouldExecuteOnScroll, setShouldExecuteOnScroll] = useState(true);
-
+  const [scale, setScale] = useState(1.0);
+  const scalePercentage = (scale * 100).toFixed(0)+'%';
 
   let pageNumInputRef = null;
+
+  const increaseZoom = () => {
+    setScale(scale + 0.3);
+  };
+
+  const decreaseZoom = () => {
+    if (scale > 0.2) {
+      setScale(scale - 0.3);
+    }
+  };
+
   const downloadURI = (uri, name) => {
     var link = document.createElement("a");
     link.download = name;
@@ -82,8 +94,6 @@ export default function App () {
 
   const handleScroll = () => {
     const inputPageNum = document.getElementById("inputPageNum");
-    console.log('document.activeElement =>',document.activeElement)
-    console.log('inputPageNum =>',inputPageNum)
     if (shouldExecuteOnScroll) {
       // if (inputPageNum !== document.activeElement) {
         if (documentRef.current) {
@@ -121,7 +131,6 @@ export default function App () {
     }
   };
 
-
   const textRenderer = useCallback(
     (textItem) => highlightPattern(textItem.str, searchText),
     [searchText]
@@ -153,6 +162,16 @@ export default function App () {
 
   useEffect(() => {
     scrollToPage(pageNum);
+    // const loadPDF = async () => {
+    //   if(pdf){
+    //     const existingPdfBytes = pdf;
+    //     const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    //     const modifiedPdfBytes = await pdfDoc.save();
+    //     setPdfData(modifiedPdfBytes);
+    //   }
+    // };
+    // console.log('scale =>',scale)
+    // loadPDF();
   }, [pageNum]);
   
   return (
@@ -178,9 +197,8 @@ export default function App () {
             }}
           />
         ) : null}
-
         {pdf ? (
-          <div>
+          <ViewerContent >
             <Box sx={{ flexGrow: 1 }}>
             {pdf ? (
               <AppBar position="static">
@@ -241,12 +259,24 @@ export default function App () {
                       >
                         <FontAwesomeIcon icon={faDownload} />
                       </Button>
+                      <button onClick={decreaseZoom}>-</button>
+                        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                          <div style={{color: 'white',fontSize: 14}}>
+                            <input
+                              style={{ width: '30px' }}
+                              value={scalePercentage}
+                              id="scalePercentage"
+                              readOnly
+                            />
+                          </div>
+                        </div>
+                      <button onClick={increaseZoom}>+</button>
                     </>
                   ) : null}
                     <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
                       <div style={{color: 'white',fontSize: 14}}>
                         <input
-                          style={{ width: '40px' }}
+                          style={{ width: '30px' }}
                           type="number"
                           onChange={(e) => onJumpToPage(e.target.value)}
                           value={pageNum}
@@ -397,24 +427,25 @@ export default function App () {
                     <React.Fragment>
                       {Array.from(new Array(totalPages), (el, index) => (
                         <React.Fragment key={`page_${index + 1}`}>
-                        <Page
-                          key={`page_${index + 1}`}
-                          pageNumber={index + 1}
-                          onClick={handleTextSelection}
-                          customTextRenderer={textRenderer}
-                          width={800}
-                          height={1200}
-                          onLoadSuccess={(data) => {
-                            setPageDetails(data);
-                          }}
-                          data-page-number={index + 1}
-                        />
+                          <Page
+                            key={`page_${index + 1}`}
+                            pageNumber={index + 1}
+                            scale={scale}
+                            onClick={handleTextSelection}
+                            customTextRenderer={textRenderer}
+                            width={800}
+                            height={1200}
+                            onLoadSuccess={(data) => {
+                              setPageDetails(data);
+                            }}
+                            data-page-number={index + 1}
+                          />
                         </React.Fragment>
                       ))}
                     </React.Fragment>
                       {/* ))} */}
                     </Document>
-                    {/* <iframe
+                    <iframe
                       width="800" height="1200" 
                       toolbar="1"
                       title="PDF Viewer"
@@ -422,11 +453,11 @@ export default function App () {
                       id="frame"
                       src={pdf}
                       style={{ border: 'none' }}
-                    /> */}
+                    />
                   </PdfContainer>
                 ) : null} 
               </div>
-          </div>
+          </ViewerContent>
         ) : null}
         {pdf ? (  
           <TextSelectView>
@@ -443,6 +474,7 @@ export default function App () {
 const PdfContainer = styled.div`
   overflow-y: auto; 
   height: 94vh; 
+  width: 100%!important;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -468,4 +500,8 @@ const PdfViewer = styled.div`
   .highlighted-text {
     background-color: yellow;
   }
+`;
+
+const ViewerContent = styled.div`
+  width: 60%!important;
 `;
