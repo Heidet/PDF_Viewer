@@ -28,6 +28,7 @@ import RotateRightIcon from '@mui/icons-material/RotateRight';
 import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
 import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
+
 // #38383d
 /// FONT Viewer #2a2a2e
 
@@ -59,10 +60,8 @@ export default function App() {
   const [allowBtnDate, setAllowBtnDate] = useState(0);
   const [allowBtnText, setAllowBtnText] = useState(0);
   const [allowBtnErase, setAllowBtnErase] = useState(0);
+  const [allowBtnSavePdf, setAllowBtnSavePdf] = useState(0);
   const [showBtnEdit, setShowBtnEdit] = useState(1);
-
-  
-
   let pageNumInputRef = null;
 
 
@@ -254,15 +253,21 @@ export default function App() {
     setAllowBtnDate(1);
     setAllowBtnText(1);
     setAllowBtnErase(1);
+    setAllowBtnSavePdf(1);
     setShowBtnEdit(0);
   }
 
   const onHideEdit = () => {
     setAllowBtnSignature(0);
-    setAllowBtnDate(0);
-    setAllowBtnText(0);
+    setAllowBtnSavePdf(0);
     setAllowBtnErase(0);
+    setAllowBtnText(0);
+    setAllowBtnDate(0);
     setShowBtnEdit(1);
+  }
+
+  const onSavePdfBase64 = () => {
+    console.log('SAVE')
   }
 
   const textRenderer = useCallback(
@@ -323,61 +328,64 @@ export default function App() {
                 <AppBar position="static">
                   <Toolbar variant="dense" style={{ backgroundColor: '#2a2a2e' }}>
                     {showBtnEdit ? (
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        onClick={() => onShowEdit() }
-                      > <EditIcon /></Button>
-                    ) : 
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        onClick={() => onHideEdit() }
-                      > <RemoveRedEyeIcon /></Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          onClick={() => onShowEdit() }
+                        > <EditIcon /></Button>
+                      ) : (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          onClick={() => onHideEdit() }
+                        > <RemoveRedEyeIcon /></Button>
+                      )
                     }
                     {!signatureURL && allowBtnSignature ? (
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        onClick={() => setSignatureDialogVisible(true)}
-                      > <FontAwesomeIcon icon={faSignature} /></Button>
-                    ) : null}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          onClick={() => setSignatureDialogVisible(true)}
+                        > <FontAwesomeIcon icon={faSignature} /></Button>
+                      ) : null
+                    }
                     {allowBtnDate ? (
-                      <Button
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        variant="outlined"
-                        size="small"
-                        onClick={() => setTextInputVisible("date")}
-                      > <FontAwesomeIcon icon={faCalendarDays} /></Button>
-                    ) : null}
+                        <Button
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setTextInputVisible("date")}
+                        > <FontAwesomeIcon icon={faCalendarDays} /></Button>
+                      ) : null
+                    }
                     {allowBtnText ? (
-                      <Button
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        variant="outlined"
-                        size="small"
-                        onClick={() => setTextInputVisible(true)}
-                      > <FontAwesomeIcon icon={faFont} /></Button>
-                    ) : null
+                        <Button
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setTextInputVisible(true)}
+                        > <FontAwesomeIcon icon={faFont} /></Button>
+                      ) : null
                     }
                     {allowBtnErase ? (
-                      <Button
-                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          setTextInputVisible(false);
-                          setSignatureDialogVisible(false);
-                          setSignatureURL(null);
-                          setPdf(null);
-                          setTotalPages(0);
-                          setPageNum(0);
-                          setPageDetails(null);
-                        }}
-                      > <FontAwesomeIcon icon={faEraser} /></Button>
-                    ) : null
+                        <Button
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            setTextInputVisible(false);
+                            setSignatureDialogVisible(false);
+                            setSignatureURL(null);
+                            setPdf(null);
+                            setTotalPages(0);
+                            setPageNum(0);
+                            setPageDetails(null);
+                          }}
+                        > <FontAwesomeIcon icon={faEraser} /></Button>
+                      ) : null
                     }
                     {pdf ? (
                       <>
@@ -440,6 +448,14 @@ export default function App() {
                     >
                       <FontAwesomeIcon icon={faPrint} />
                     </Button>
+                    {allowBtnSavePdf ? (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        style={{ height: '2.5em', marginLeft: 8, marginRight: 0, color: 'white', border: "1px solid white" }}
+                        onClick={() => onSavePdfBase64() }
+                      > <SaveIcon /></Button>
+                    ) : null}
                   </Toolbar>
                 </AppBar>
               ) : null}
