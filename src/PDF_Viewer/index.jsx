@@ -1,7 +1,7 @@
 import "../App.css";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Document, Page, pdfjs, Outline } from "react-pdf";
-import { NonFullScreenPageMode, PDFDocument, rgb } from "pdf-lib";
+import { NonFullScreenPageMode, PDFDocument, rgb, degrees } from "pdf-lib";
 import { blobToURL } from "../utils/Utils";
 import { AddSigDialog } from "../components/AddSigDialog";
 import DraggableSignature from "../components/DraggableSignature";
@@ -24,13 +24,17 @@ import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
 import { faPrint } from '@fortawesome/free-solid-svg-icons';
 import EditNoteIcon from '@mui/icons-material/EditNote';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
+import SaveIcon from '@mui/icons-material/Save';
+import EditIcon from '@mui/icons-material/Edit';
+import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
+// #38383d
+/// FONT Viewer #2a2a2e
+
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 pdfjs.GlobalWorkerOptions.useWorkerFetch = true;
-const ALLOWBTNSIGNATURE = true
-const ALLOWBTNDATE = true
-const ALLOWBTNTEXT = true
-const ALLOWBTNERASE = true
+
 
 
 export default function App() {
@@ -49,8 +53,39 @@ export default function App() {
   const [shouldExecuteOnScroll, setShouldExecuteOnScroll] = useState(true);
   const [scale, setScale] = useState(1.0);
   const scalePercentage = (scale * 100).toFixed(0) + '%';
+  const [rotationAngle, setRotationAngle] = useState(0);
+  const [rotationAngles, setRotationAngles] = useState({});
+  const [allowBtnSignature, setAllowBtnSignature] = useState(0);
+  const [allowBtnDate, setAllowBtnDate] = useState(0);
+  const [allowBtnText, setAllowBtnText] = useState(0);
+  const [allowBtnErase, setAllowBtnErase] = useState(0);
+  const [showBtnEdit, setShowBtnEdit] = useState(1);
+
+  
 
   let pageNumInputRef = null;
+
+
+  const handleRotation = () => {
+    setRotationAngle(90)
+
+    if (rotationAngle === 90) {
+      setRotationAngle(180)
+    } else if (rotationAngle === 180) {
+      setRotationAngle(270)
+    } 
+    else if (rotationAngle === 270) {
+      setRotationAngle(360)
+    } 
+    else if (rotationAngle === 360) {
+      setRotationAngle(0)
+    } 
+
+    setRotationAngles((prevAngles) => ({
+      ...prevAngles,
+      [pageNum]: rotationAngle,
+    }));
+  };
 
   const increaseZoom = () => {
     setScale(scale + 0.3);
@@ -68,8 +103,23 @@ export default function App() {
     setScale(value);
   };
 
+  // const downloadURI = (uri, name) => {
+  //   const link = document.createElement('a');
+  //   link.href = uri;
+  //   link.download = name;
+  //   document.body.appendChild(link);
+  //   link.click();
+  //   document.body.removeChild(link);
+  // };
+
   const downloadURI = (uri, name) => {
-    const base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
+    let base64Data = undefined
+    if (pdf.startsWith('data:application/pdf;base64,')) {
+      base64Data = pdf.replace(/^data:application\/pdf;base64,/, '');
+    }else {
+      base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
+    }
+
     const blob = base64ToBlob(base64Data, 'application/pdf');
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -91,19 +141,57 @@ export default function App() {
     }
   };
 
-  const handlePrintPdf = () => {
-    const base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
-    const blob = base64ToBlob(base64Data, 'application/pdf');
-    const blobUrl = URL.createObjectURL(blob);
+  const handlePrintPdf = async () => {
+    const newPdfDoc = await PDFDocument.create();
+    // const pdfDoc = await PDFDocument.load(pdf);
+    // const pages = pdfDoc.getPages();
+    console.log('pdf =>',pdf)
+    console.log('documentRef =>',documentRef)
+    const pdfDoc = await PDFDocument.load(pdf);
+    console.log('pdfDoc =>',pdfDoc)
 
-    const pdfWindow = window.open(blobUrl, '_blank');
-    if (pdfWindow) {
-      pdfWindow.onload = () => {
-        pdfWindow.print();
-        URL.revokeObjectURL(blobUrl);
-      };
+    for (let i = 1; i <= totalPages; i++) {
+      console.log('totalPages =>',totalPages)
+      const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i - 1]);
+      console.log('copiedPage =>',copiedPage)
+
+      // const page = pdfDoc.addPage([copiedPage.getWidth(), copiedPage.getHeight()]);
+      // page.setRotation(degrees(rotationAngles[i] || 0));
+      // page.drawPage(copiedPage);
     }
+  
+    // const pdfBytes = await pdfDoc.save();
+    // const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    // const blobUrl = URL.createObjectURL(blob);
+  
+    // const pdfWindow = window.open(blobUrl, "_blank");
+    // if (pdfWindow) {
+    //   pdfWindow.onload = () => {
+    //     pdfWindow.print();
+    //     URL.revokeObjectURL(blobUrl);
+    //   };
+    // }
   };
+  
+  // const handlePrintPdf = () => {
+  //   let base64Data = undefined
+  //   if (pdf.startsWith('data:application/pdf;base64,')) {
+  //     base64Data = pdf.replace(/^data:application\/pdf;base64,/, '');
+  //   }else {
+  //     base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
+  //   }
+
+  //   const blob = base64ToBlob(base64Data, 'application/pdf');
+  //   const blobUrl = URL.createObjectURL(blob);
+
+  //   const pdfWindow = window.open(blobUrl, '_blank');
+  //   if (pdfWindow) {
+  //     pdfWindow.onload = () => {
+  //       pdfWindow.print();
+  //       URL.revokeObjectURL(blobUrl);
+  //     };
+  //   }
+  // };
 
   const handleScroll = () => {
     const inputPageNum = document.getElementById("inputPageNum");
@@ -161,6 +249,22 @@ export default function App() {
     }
   };
 
+  const onShowEdit = () => {
+    setAllowBtnSignature(1);
+    setAllowBtnDate(1);
+    setAllowBtnText(1);
+    setAllowBtnErase(1);
+    setShowBtnEdit(0);
+  }
+
+  const onHideEdit = () => {
+    setAllowBtnSignature(0);
+    setAllowBtnDate(0);
+    setAllowBtnText(0);
+    setAllowBtnErase(0);
+    setShowBtnEdit(1);
+  }
+
   const textRenderer = useCallback(
     (textItem) => highlightPattern(textItem.str, searchText),
     [searchText]
@@ -217,16 +321,31 @@ export default function App() {
             <Box sx={{ flexGrow: 1 }}>
               {pdf ? (
                 <AppBar position="static">
-                  <Toolbar variant="dense" style={{ backgroundColor: '#38383d' }}>
-                    {!signatureURL && ALLOWBTNSIGNATURE ? (
+                  <Toolbar variant="dense" style={{ backgroundColor: '#2a2a2e' }}>
+                    {showBtnEdit ? (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                        onClick={() => onShowEdit() }
+                      > <EditIcon /></Button>
+                    ) : 
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                        onClick={() => onHideEdit() }
+                      > <RemoveRedEyeIcon /></Button>
+                    }
+                    {!signatureURL && allowBtnSignature ? (
                       <Button
                         variant="outlined"
                         size="small"
                         style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         onClick={() => setSignatureDialogVisible(true)}
                       > <FontAwesomeIcon icon={faSignature} /></Button>
-                      ) : null}
-                    {ALLOWBTNDATE ? (
+                    ) : null}
+                    {allowBtnDate ? (
                       <Button
                         style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
@@ -234,7 +353,7 @@ export default function App() {
                         onClick={() => setTextInputVisible("date")}
                       > <FontAwesomeIcon icon={faCalendarDays} /></Button>
                     ) : null}
-                    {ALLOWBTNTEXT ? (
+                    {allowBtnText ? (
                       <Button
                         style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
@@ -243,7 +362,7 @@ export default function App() {
                       > <FontAwesomeIcon icon={faFont} /></Button>
                     ) : null
                     }
-                    {ALLOWBTNERASE ? (
+                    {allowBtnErase ? (
                       <Button
                         style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
                         variant="outlined"
@@ -262,16 +381,6 @@ export default function App() {
                     }
                     {pdf ? (
                       <>
-                        <Button
-                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
-                          variant="outlined"
-                          size="small"
-                          onClick={() => {
-                            downloadURI(pdf, "file.pdf");
-                          }}
-                        >
-                          <FontAwesomeIcon icon={faDownload} />
-                        </Button>
                         <button style={{ color: 'white', background: 'transparent', border: 'none', fontSize: '30px', marginBottom: '0.2em' }} onClick={decreaseZoom}>-</button>
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                           <div style={{ color: 'white', fontSize: 14 }}>
@@ -284,6 +393,14 @@ export default function App() {
                           </div>
                         </div>
                         <button style={{ color: 'white', background: 'transparent', border: 'none', fontSize: '30px' }} onClick={increaseZoom}>+</button>
+                        <Button
+                          style={{ height: '2.5em', marginRight: 8, color: 'white', border: "1px solid white" }}
+                          variant="outlined"
+                          size="small"
+                          onClick={handleRotation}
+                        >
+                          <RotateRightIcon /> 
+                        </Button>
                       </>
                     ) : null}
                     <div style={{ color: 'silver' }}>|</div>
@@ -303,10 +420,20 @@ export default function App() {
                     </div>
                     <div style={{ color: 'silver' }}>|</div>
                     <div style={{ marginLeft: 8 }}>
-                      <input placeholder="Rechercher :" style={{ marginLeft: 2, borderRadius: '0.5em' }} type="search" id="search" value={searchText} onChange={onChange} />
+                      <input placeholder="Rechercher :" style={{ marginLeft: 2, borderRadius: '0.5em', height:'2em' }} type="search" id="search" value={searchText} onChange={onChange} />
                     </div>
                     <Button
-                      style={{ height: '2.5em', marginLeft: 8, color: 'white', border: "1px solid white" }}
+                      style={{ height: '2.5em', marginLeft: 8, marginRight: 8, color: 'white', border: "1px solid white" }}
+                      variant="outlined"
+                      size="small"
+                      onClick={() => {
+                        downloadURI(pdf, "file.pdf");
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faDownload} />
+                    </Button>
+                    <Button
+                      style={{ height: '2.5em', marginLeft: 0, color: 'white', border: "1px solid white" }}
                       variant="outlined"
                       size="small"
                       onClick={handlePrintPdf}
@@ -435,6 +562,7 @@ export default function App() {
                     file={pdf}
                     onLoadSuccess={(data) => {
                       setTotalPages(data.numPages);
+                      // documentRef.current = data;
                     }}
                   >
                     <React.Fragment>
@@ -451,6 +579,7 @@ export default function App() {
                             onLoadSuccess={(data) => {
                               setPageDetails(data);
                             }}
+                            rotate={rotationAngles[index + 1] || 0} 
                             data-page-number={index + 1}
                           />
                         </React.Fragment>
@@ -466,7 +595,7 @@ export default function App() {
           <TextSelectView>
             <strong>Texte sélectionné : {selectedText}</strong>
           </TextSelectView>
-        ): null}
+        ) : null}
       </Viewer>
     </PdfViewer>
   );
@@ -479,6 +608,7 @@ const PdfContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+  background-color:#38383d!important;
 `;
 
 const TextSelectView = styled.div`
