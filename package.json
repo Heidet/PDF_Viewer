@@ -22,6 +22,7 @@
     "dayjs": "^1.11.9",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.9.179",
+    "perf_hooks": "^0.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-draggable": "^4.4.5",

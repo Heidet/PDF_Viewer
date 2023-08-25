@@ -1,7 +1,7 @@
 import "../App.css";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Document, Page, pdfjs, Outline } from "react-pdf";
-import { NonFullScreenPageMode, PDFDocument, rgb, degrees } from "pdf-lib";
+import { Document, Page, pdfjs, Outline, Thumbnail } from "react-pdf";
+import { NonFullScreenPageMode, PDFDocument, rgb, degrees, Image  } from "pdf-lib";
 import { blobToURL } from "../utils/Utils";
 import { AddSigDialog } from "../components/AddSigDialog";
 import DraggableSignature from "../components/DraggableSignature";
@@ -28,14 +28,18 @@ import RotateRightIcon from '@mui/icons-material/RotateRight';
 import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
 import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
-
+import Fab from '@mui/material/Fab';
+import UpIcon from '@mui/icons-material/KeyboardArrowUp';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import CircularProgress from '@mui/material/CircularProgress';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import { CropLandscapeOutlined } from "@mui/icons-material";
 // #38383d
 /// FONT Viewer #2a2a2e
 
-
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
-pdfjs.GlobalWorkerOptions.useWorkerFetch = true;
-
+pdfjs.GlobalWorkerOptions.useWorkerFetch = false;
 
 
 export default function App() {
@@ -48,7 +52,6 @@ export default function App() {
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [pageDetails, setPageDetails] = useState(null);
-  const documentRef = useRef(null);
   const [selectedText, setSelectedText] = useState('');
   const [searchText, setSearchText] = useState('');
   const [shouldExecuteOnScroll, setShouldExecuteOnScroll] = useState(true);
@@ -60,10 +63,21 @@ export default function App() {
   const [allowBtnDate, setAllowBtnDate] = useState(0);
   const [allowBtnText, setAllowBtnText] = useState(0);
   const [allowBtnErase, setAllowBtnErase] = useState(0);
-  const [allowBtnSavePdf, setAllowBtnSavePdf] = useState(0);
+  const [allowBtnSavePdf, setAllowBtnSavePdf] = useState(1);
   const [showBtnEdit, setShowBtnEdit] = useState(1);
-  let pageNumInputRef = null;
+  const [adjustPageWidth, setAdjustPageWidth] = useState(false); 
+  const [thumbnailsVisible, setThumbnailsVisible] = useState(false);
+  const [selectedThumbnailIndex, setSelectedThumbnailIndex] = useState(null);
 
+  // const [thumbnailBatch, setThumbnailBatch] = useState([]);
+  // const [lastLoadedThumbnailIndex, setLastLoadedThumbnailIndex] = useState(0);
+  
+  const [thumbnails, setThumbnails] = useState([]);
+  let pageNumInputRef = null;
+  const viewerContainerRef = useRef(null);
+  const documentRef = useRef(null);
+  const [thumbnailsLoaded, setThumbnailsLoaded] = useState(false); 
+  // const [loadingThumbnails, setLoadingThumbnails] = useState(true);
 
   const handleRotation = () => {
     setRotationAngle(90)
@@ -72,13 +86,13 @@ export default function App() {
       setRotationAngle(180)
     } else if (rotationAngle === 180) {
       setRotationAngle(270)
-    } 
+    }
     else if (rotationAngle === 270) {
       setRotationAngle(360)
-    } 
+    }
     else if (rotationAngle === 360) {
       setRotationAngle(0)
-    } 
+    }
 
     setRotationAngles((prevAngles) => ({
       ...prevAngles,
@@ -102,20 +116,11 @@ export default function App() {
     setScale(value);
   };
 
-  // const downloadURI = (uri, name) => {
-  //   const link = document.createElement('a');
-  //   link.href = uri;
-  //   link.download = name;
-  //   document.body.appendChild(link);
-  //   link.click();
-  //   document.body.removeChild(link);
-  // };
-
   const downloadURI = (uri, name) => {
     let base64Data = undefined
     if (pdf.startsWith('data:application/pdf;base64,')) {
       base64Data = pdf.replace(/^data:application\/pdf;base64,/, '');
-    }else {
+    } else {
       base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
     }
 
@@ -128,74 +133,67 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const onJumpToPage = (pageNumber) => {
-    const parsedPageNumber = parseInt(pageNumber, 10);
-    if (!isNaN(parsedPageNumber) && parsedPageNumber > 0 && parsedPageNumber <= totalPages) {
-      setPageNum(parsedPageNumber);
-      setShouldExecuteOnScroll(false);
-
-      setTimeout(() => {
-        setShouldExecuteOnScroll(true);
-      }, 1000);
-    }
-  };
-
   const handlePrintPdf = async () => {
-    const newPdfDoc = await PDFDocument.create();
-    // const pdfDoc = await PDFDocument.load(pdf);
-    // const pages = pdfDoc.getPages();
-    console.log('pdf =>',pdf)
-    console.log('documentRef =>',documentRef)
-    const pdfDoc = await PDFDocument.load(pdf);
-    console.log('pdfDoc =>',pdfDoc)
+    let base64Data = undefined;
 
-    for (let i = 1; i <= totalPages; i++) {
-      console.log('totalPages =>',totalPages)
-      const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i - 1]);
-      console.log('copiedPage =>',copiedPage)
+    console.log('pdf =>', pdf)
+    console.log('pdf.startsWith(blob:) =>', pdf.startsWith('blob:'))
+    if (pdf.startsWith('blob:')) {
+      const pdfWindow = window.open(pdf, '_blank');
+      console.log(pdfWindow)
+      if (pdfWindow) {
+        pdfWindow.onload = () => {
+          pdfWindow.print();
+          URL.revokeObjectURL(pdf);
+        };
+      }
+    } else {
+      if (pdf.startsWith('data:application/pdf;base64,')) {
+        base64Data = pdf.replace(/^data:application\/pdf;base64,/, '');
+      } else {
+        base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
+      }
 
-      // const page = pdfDoc.addPage([copiedPage.getWidth(), copiedPage.getHeight()]);
-      // page.setRotation(degrees(rotationAngles[i] || 0));
-      // page.drawPage(copiedPage);
+      // const pdfDoc = await PDFDocument.load(pdf);
+      const blob = base64ToBlob(base64Data, 'application/pdf');
+      const blobUrl = URL.createObjectURL(blob);
+
+      const pdfWindow = window.open(blobUrl, '_blank');
+      if (pdfWindow) {
+        pdfWindow.onload = () => {
+          pdfWindow.print();
+          URL.revokeObjectURL(pdf);
+        };
+      }
     }
-  
-    // const pdfBytes = await pdfDoc.save();
-    // const blob = new Blob([pdfBytes], { type: "application/pdf" });
-    // const blobUrl = URL.createObjectURL(blob);
-  
-    // const pdfWindow = window.open(blobUrl, "_blank");
-    // if (pdfWindow) {
-    //   pdfWindow.onload = () => {
-    //     pdfWindow.print();
-    //     URL.revokeObjectURL(blobUrl);
-    //   };
-    // }
   };
+
+  // const loadNextThumbnailBatch = async () => {
+  //   const newBatch = [];
+  //   const pdfDoc = await PDFDocument.load(await fetch(pdf).then(res => res.arrayBuffer()));
+  //   for (let i = lastLoadedThumbnailIndex; i < lastLoadedThumbnailIndex + 10 && i < totalPages; i++) {
+  //     const page = await pdfDoc.getPage(i + 1);
+  //     const viewport = page.getViewport({ scale: 0.2 });
+  //     const canvas = document.createElement('canvas');
+  //     const canvasContext = canvas.getContext('2d');
+  //     canvas.width = viewport.width;
+  //     canvas.height = viewport.height;
   
-  // const handlePrintPdf = () => {
-  //   let base64Data = undefined
-  //   if (pdf.startsWith('data:application/pdf;base64,')) {
-  //     base64Data = pdf.replace(/^data:application\/pdf;base64,/, '');
-  //   }else {
-  //     base64Data = pdf.replace(/^data:application\/octet-stream;base64,/, '');
-  //   }
-
-  //   const blob = base64ToBlob(base64Data, 'application/pdf');
-  //   const blobUrl = URL.createObjectURL(blob);
-
-  //   const pdfWindow = window.open(blobUrl, '_blank');
-  //   if (pdfWindow) {
-  //     pdfWindow.onload = () => {
-  //       pdfWindow.print();
-  //       URL.revokeObjectURL(blobUrl);
+  //     const renderContext = {
+  //       canvasContext,
+  //       viewport,
   //     };
+  //     await page.render(renderContext).promise;
+  //     const thumbnailDataURL = canvas.toDataURL('image/jpeg');
+  //     newBatch.push(thumbnailDataURL);
   //   }
+  
+  //   setThumbnailBatch(prevBatch => [...prevBatch, ...newBatch]);
+  //   setLastLoadedThumbnailIndex(lastLoadedIndex => lastLoadedIndex + 10);
   // };
 
   const handleScroll = () => {
-    const inputPageNum = document.getElementById("inputPageNum");
     if (shouldExecuteOnScroll) {
-      // if (inputPageNum !== document.activeElement) {
       if (documentRef.current) {
         const parentElement = documentRef.current;
         const pageElements = parentElement.querySelectorAll('[data-page-number]');
@@ -203,19 +201,21 @@ export default function App() {
         let smallestDistanceToTop = Infinity;
         for (let i = 0; i < pageElements.length; i++) {
           const pageElement = pageElements[i];
-          const rect = pageElement.getBoundingClientRect();
-          const distanceToTop = Math.abs(rect.top);
-          if (distanceToTop < smallestDistanceToTop) {
-            smallestDistanceToTop = distanceToTop;
-            currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
+
+          if (!pageElement.classList.contains('react-pdf__Thumbnail__page')) {
+            const rect = pageElement.getBoundingClientRect();
+            const distanceToTop = Math.abs(rect.top);
+            if (distanceToTop < smallestDistanceToTop) {
+              smallestDistanceToTop = distanceToTop;
+              currentPageNumber = parseInt(pageElement.getAttribute('data-page-number'));
+            }
           }
         }
         setPageNum(currentPageNumber);
       }
-      // }
     }
   };
-
+  
   const base64ToBlob = (base64Data, contentType) => {
     const byteCharacters = atob(base64Data);
     const byteArrays = [];
@@ -234,16 +234,21 @@ export default function App() {
     return new Blob(byteArrays, { type: contentType });
   }
 
+  const scrollToTop = () => {
+    scrollToPage(1);
+  };
+
   const scrollToPage = (pageNumber) => {
     if (documentRef.current) {
       const pageElement = documentRef.current.querySelector(`[data-page-number="${pageNumber}"]`);
       if (pageElement) {
         pageElement.scrollIntoView({ behavior: "smooth" });
+        setPageNum(pageNumber);
         setTimeout(() => {
           if (pageNumInputRef) {
             pageNumInputRef.blur();
           }
-        }, 1000);
+        }, 2000);
       }
     }
   };
@@ -270,6 +275,22 @@ export default function App() {
     console.log('SAVE')
   }
 
+  const removePage = async () => {
+    if (!pdf) return;
+
+    const pdfDoc = await PDFDocument.load(await fetch(pdf).then(res => res.arrayBuffer()));
+    if (!pdfDoc) return;
+
+    const pages = pdfDoc.getPages();
+    if (pageNum > 0 && pageNum <= pages.length) {
+      pdfDoc.removePage(pageNum - 1);
+      const newPdfBytes = await pdfDoc.save();
+      const newPdfUrl = URL.createObjectURL(new Blob([newPdfBytes], { type: 'application/pdf' }));
+      setPdf(newPdfUrl);
+      setTotalPages(pages.length - 1);
+    }
+  };
+
   const textRenderer = useCallback(
     (textItem) => highlightPattern(textItem.str, searchText),
     [searchText]
@@ -294,10 +315,80 @@ export default function App() {
     }
   };
 
+
+  // useEffect(() => {
+  //   (async () => {
+  //     if (!pdf) return;
+  
+  //     const loadingTask = pdfjs.getDocument(pdf);
+  //     const pdfDocument = await loadingTask.promise;
+  //     const numPages = pdfDocument.numPages;
+  
+  //     const extractedThumbnails = [];
+  
+  //     for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
+  //       const page = await pdfDocument.getPage(pageNumber);
+  //       const viewport = page.getViewport({ scale: 0.2 });
+  
+  //       const canvas = document.createElement('canvas');
+  //       const canvasContext = canvas.getContext('2d');
+  //       canvas.width = viewport.width;
+  //       canvas.height = viewport.height;
+  
+  //       const renderContext = {
+  //         canvasContext,
+  //         viewport,
+  //       };
+  //       await page.render(renderContext).promise;
+  //       const thumbnailDataURL = canvas.toDataURL('image/jpeg');
+  //       extractedThumbnails.push(thumbnailDataURL);
+  //     }
+
+  //     setThumbnails(extractedThumbnails);
+  //   })();
+  // }, [pdf]);
+
+  // useEffect(() => {
+  //   setLoadingThumbnails(true);
+  //   if (pdf) {
+  //     const loadingTask = pdfjs.getDocument(pdf);
+  //     loadingTask.promise.then(async (pdfDocument) => {
+  //       const numPages = pdfDocument.numPages;
+  //       const thumbnailPromises = [];
+  
+  //       for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
+  //         const page = await pdfDocument.getPage(pageNumber);
+  //         const viewport = page.getViewport({ scale: 0.2 });
+  //         const canvas = document.createElement('canvas');
+  //         const canvasContext = canvas.getContext('2d');
+  //         canvas.width = viewport.width;
+  //         canvas.height = viewport.height;
+  
+  //         const renderContext = {
+  //           canvasContext,
+  //           viewport,
+  //         };
+  
+  //         await page.render(renderContext).promise;
+  //         const thumbnailDataURL = canvas.toDataURL();
+  //         thumbnailPromises.push(thumbnailDataURL);
+  //       }
+  
+  //       setThumbnails(thumbnailPromises);
+  //       setThumbnailsLoaded(true);
+  //       setAdjustPageWidth(true);
+  //       setLoadingThumbnails(false);
+  //     }).catch((error) => {
+  //       setLoadingThumbnails(false);
+  //       console.error('Erreur lors du chargement des vignettes:', error);
+  //     });
+  //   }
+  // }, [pdf]);
+  
   useEffect(() => {
     setSelectedText('');
     scrollToPage(pageNum);
-  }, [pageNum]);
+  }, [pageNum, selectedThumbnailIndex]);
 
   return (
     <PdfViewer>
@@ -327,7 +418,15 @@ export default function App() {
               {pdf ? (
                 <AppBar position="static">
                   <Toolbar variant="dense" style={{ backgroundColor: '#2a2a2e' }}>
-                    {showBtnEdit ? (
+                    <Button
+                      style={{ height: '2.5em', marginRight: 8, color: 'white', border: '1px solid white' }}
+                      variant="outlined"
+                      size="small"
+                      onClick={removePage}
+                    >
+                      Supprimer cette page
+                    </Button>
+                    {/* {showBtnEdit ? (
                         <Button
                           variant="outlined"
                           size="small"
@@ -386,7 +485,7 @@ export default function App() {
                           }}
                         > <FontAwesomeIcon icon={faEraser} /></Button>
                       ) : null
-                    }
+                    } */}
                     {pdf ? (
                       <>
                         <button style={{ color: 'white', background: 'transparent', border: 'none', fontSize: '30px', marginBottom: '0.2em' }} onClick={decreaseZoom}>-</button>
@@ -407,7 +506,7 @@ export default function App() {
                           size="small"
                           onClick={handleRotation}
                         >
-                          <RotateRightIcon /> 
+                          <RotateRightIcon />
                         </Button>
                       </>
                     ) : null}
@@ -417,7 +516,7 @@ export default function App() {
                         <input
                           style={{ width: '30px' }}
                           type="number"
-                          onChange={(e) => onJumpToPage(e.target.value)}
+                          onChange={(e) => scrollToPage(e.target.value)}
                           value={pageNum}
                           id="inputPageNum"
                           ref={(input) => {
@@ -428,7 +527,7 @@ export default function App() {
                     </div>
                     <div style={{ color: 'silver' }}>|</div>
                     <div style={{ marginLeft: 8 }}>
-                      <input placeholder="Rechercher :" style={{ marginLeft: 2, borderRadius: '0.5em', height:'2em' }} type="search" id="search" value={searchText} onChange={onChange} />
+                      <input placeholder="Rechercher :" style={{ marginLeft: 2, borderRadius: '0.5em', height: '2em' }} type="search" id="search" value={searchText} onChange={onChange} />
                     </div>
                     <Button
                       style={{ height: '2.5em', marginLeft: 8, marginRight: 8, color: 'white', border: "1px solid white" }}
@@ -453,8 +552,8 @@ export default function App() {
                         variant="outlined"
                         size="small"
                         style={{ height: '2.5em', marginLeft: 8, marginRight: 0, color: 'white', border: "1px solid white" }}
-                        onClick={() => onSavePdfBase64() }
-                      > <SaveIcon /></Button>
+                        onClick={() => onSavePdfBase64()}
+                      > <FileUploadIcon /></Button>
                     ) : null}
                   </Toolbar>
                 </AppBar>
@@ -573,35 +672,78 @@ export default function App() {
                 />
               ) : null}
               {pdf ? (
-                <PdfContainer onScroll={handleScroll}>
+                <PdfContainer ref={viewerContainerRef} onScroll={handleScroll}>
                   <Document
                     file={pdf}
                     onLoadSuccess={(data) => {
                       setTotalPages(data.numPages);
-                      // documentRef.current = data;
                     }}
                   >
-                    <React.Fragment>
-                      {Array.from(new Array(totalPages), (el, index) => (
-                        <React.Fragment key={`page_${index + 1}`}>
-                          <Page
-                            key={`page_${index + 1}`}
-                            pageNumber={index + 1}
-                            scale={scale}
-                            onClick={handleTextSelection}
-                            customTextRenderer={textRenderer}
-                            width={800}
-                            height={1200}
-                            onLoadSuccess={(data) => {
-                              setPageDetails(data);
-                            }}
-                            rotate={rotationAngles[index + 1] || 0} 
-                            data-page-number={index + 1}
-                          />
-                        </React.Fragment>
-                      ))}
-                    </React.Fragment>
+                    <Container>
+                      {thumbnailsVisible && (
+                        <ThumbnailContainer >
+                          {Array.from(new Array(totalPages), (el, index) => (
+                            <Thumbnail
+                              key={`thumb_${index + 1}`}
+                              pageNumber={index + 1}
+                              width={150}
+                              onClick={() => setSelectedThumbnailIndex(index)}
+                              data-thumb-number={index + 1}
+                              className={selectedThumbnailIndex === index ? 'selected' : ''}
+                            />
+                          ))}
+                        </ThumbnailContainer>
+                      )}
+                      
+                      {/* {loadingThumbnails ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                          <CircularProgress size={50} /> 
+                        </div>
+                      ) : (
+                        <> */}
+                          <Button
+                            onClick={() => setThumbnailsVisible(!thumbnailsVisible)}
+                            style={{ position: 'absolute', top: '50%', left: thumbnailsVisible ? '15%' : '5%', zIndex: 9999 }}
+                          >
+                            {thumbnailsVisible ? <ArrowForwardIosIcon style={{color: 'white'}}/> : <ArrowBackIosNewIcon style={{color: 'white'}}/>}
+                          </Button>
+                          <PagesContainer>
+                            {Array.from(new Array(totalPages), (el, index) => (
+                              <Page
+                                key={`page_${index + 1}`}
+                                pageNumber={index + 1}
+                                scale={scale}
+                                onClick={handleTextSelection}
+                                customTextRenderer={textRenderer}
+                                width={adjustPageWidth ? 900 : undefined}
+                                height={1200}
+                                onLoadSuccess={(data) => {
+                                  setPageDetails(data);
+                                }}
+                                rotate={rotationAngles[index + 1] || 0}
+                                data-page-number={index + 1}
+                              />
+                            ))}
+                          </PagesContainer>
+                        {/* </>
+                      )} */}
+                      <Fab
+                        variant="extended"
+                        size="small"
+                        style={{
+                          borderRadius: '2em',
+                          position: 'fixed',
+                          height: '3em',
+                          bottom: '20px',
+                          right: '40%',
+                          backgroundColor: 'rgb(215 201 28)',
+                        }}
+                      >
+                        <UpIcon onClick={scrollToTop} />
+                      </Fab>
+                    </Container>
                   </Document>
+
                 </PdfContainer>
               ) : null}
             </div>
@@ -617,6 +759,7 @@ export default function App() {
   );
 }
 
+
 const PdfContainer = styled.div`
   overflow-y: auto; 
   height: 94vh; 
@@ -625,6 +768,7 @@ const PdfContainer = styled.div`
   flex-direction: column;
   align-items: center;
   background-color:#38383d!important;
+
 `;
 
 const TextSelectView = styled.div`
@@ -644,11 +788,54 @@ const Viewer = styled.div`
 
 const PdfViewer = styled.div`
   // padding-top: 4em;
+  .selected {
+    border: 5px solid rgb(215, 201, 28);
+  }
+  .react-pdf__Thumbnail{
+    margin-top: 0.5em;
+  }
   .highlighted-text {
     background-color: yellow;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #ffffff66;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ffffff66;
   }
 `;
 
 const ViewerContent = styled.div`
   width: 60%!important;
+`;
+
+const ThumbnailContainer = styled.div`
+  display: ${props => props.loading ? 'none' : 'flex'}; 
+  flex-direction: column;
+  height: 94vh!important;
+  overflow: auto;
+  position: sticky;
+  top: 0; 
+
+`;
+
+const PagesContainer = styled.div`
+
+  display: flex;
+  flex-direction: column;
+  margin-left: 30px; 
+`;
+
+const Container = styled.div`
+  display: flex;
 `;
